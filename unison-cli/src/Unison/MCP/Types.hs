@@ -13,6 +13,7 @@ module Unison.MCP.Types
     ListLibraryDefinitionsToolArguments (..),
     ViewDefinitionsToolArguments (..),
     UpdateDefinitionsToolArguments (..),
+    DiffUpdateToolArguments (..),
     SearchDefinitionsToolArguments (..),
     SearchByTypeToolArguments (..),
     DocsToolArguments (..),
@@ -84,6 +85,7 @@ data ToolKind
   | DependenciesTool
   | DependentsTool
   | TestsTool
+  | DiffUpdateTool
   deriving (Eq, Ord, Show, Bounded, Enum)
 
 kindNameMapping :: Map ToolKind Text
@@ -108,7 +110,8 @@ kindNameMapping =
       (GetCurrentProjectContextTool, "get-current-project-context"),
       (DependenciesTool, "list-definition-dependencies"),
       (DependentsTool, "list-definition-dependents"),
-      (TestsTool, "run-tests")
+      (TestsTool, "run-tests"),
+      (DiffUpdateTool, "diff-update")
     ]
 
 data ProjectDefinitionNameArgument = ProjectDefinitionNameArgument
@@ -337,6 +340,69 @@ instance FromJSON UpdateDefinitionsToolArguments where
           text <- source .: "text"
           pure $ Right text
     pure $ UpdateDefinitionsToolArguments {projectContext, code}
+
+data DiffUpdateToolArguments = DiffUpdateToolArguments
+  { projectContext :: ProjectContext,
+    code :: Either FilePath Text
+  }
+  deriving (Eq, Show)
+
+instance HasInputSchema DiffUpdateToolArguments where
+  toInputSchema _ =
+    object
+      [ "type" .= ("object" :: Text),
+        "properties"
+          .= object
+            [ "projectContext" .= toInputSchema (Proxy :: Proxy ProjectContext),
+              "code"
+                .= object
+                  [ "description" .= ("The source code to diff against the current codebase. If a string, it is the source code itself. If a file path, it is the path to a file containing the source code." :: Text),
+                    "oneOf"
+                      .= [ object
+                             [ "description" .= ("The file path to the source code." :: Text),
+                               "type" .= ("object" :: Text),
+                               "properties"
+                                 .= object
+                                   [ "filePath"
+                                       .= object
+                                         [ "type" .= ("string" :: Text),
+                                           "description" .= ("An absolute file path to the source code." :: Text)
+                                         ]
+                                   ],
+                               "required" .= ["filePath" :: Text],
+                               "additionalProperties" .= False
+                             ],
+                           object
+                             [ "description" .= ("The source code to use." :: Text),
+                               "type" .= ("object" :: Text),
+                               "properties"
+                                 .= object
+                                   [ "text"
+                                       .= object
+                                         [ "type" .= ("string" :: Text),
+                                           "description" .= ("The source code." :: Text)
+                                         ]
+                                   ],
+                               "required" .= ["text" :: Text],
+                               "additionalProperties" .= False
+                             ]
+                         ]
+                  ]
+            ],
+        "required" .= ["projectContext", "code" :: Text]
+      ]
+
+instance FromJSON DiffUpdateToolArguments where
+  parseJSON = withObject "DiffUpdateToolArguments" $ \o -> do
+    projectContext <- o .: "projectContext"
+    source <- o .: "code"
+    code <-
+      source .:? "filePath" >>= \case
+        Just filePath -> pure $ Left filePath
+        Nothing -> do
+          text <- source .: "text"
+          pure $ Right text
+    pure $ DiffUpdateToolArguments {projectContext, code}
 
 data ListLibraryDefinitionsToolArguments = ListLibraryDefinitionsToolArguments
   { projectContext :: ProjectContext,
