@@ -64,6 +64,10 @@ library
       Unison.Runtime.Foreign.Function.Type
       Unison.Runtime.Interface
       Unison.Runtime.InternalError
+      Unison.Runtime.JavaScript.Emit
+      Unison.Runtime.JavaScript.Intrinsics
+      Unison.Runtime.JavaScript.Render
+      Unison.Runtime.JavaScript.Types
       Unison.Runtime.IOSource
       Unison.Runtime.Machine
       Unison.Runtime.Machine.Primops
