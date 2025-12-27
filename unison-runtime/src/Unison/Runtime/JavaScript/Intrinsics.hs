@@ -13,10 +13,12 @@
 module Unison.Runtime.JavaScript.Intrinsics
   ( emitPOp,
     runtimeFunctions,
+    builtinToJs,
   )
 where
 
 import Data.Text (Text)
+import Data.Text qualified as Text
 import Unison.Runtime.ANF.POp (POp (..))
 import Unison.Runtime.JavaScript.Types
 
@@ -299,6 +301,8 @@ runtimeFunctions =
   \const $compare = (a, b) => a < b ? -1n : a > b ? 1n : 0n;\n\
   \const $lessOrEqual = (a, b) => $compare(a, b) <= 0n;\n\
   \const $lessThan = (a, b) => $compare(a, b) < 0n;\n\
+  \const $greaterThan = (a, b) => $compare(a, b) > 0n;\n\
+  \const $greaterOrEqual = (a, b) => $compare(a, b) >= 0n;\n\
   \\n\
   \// Error\n\
   \const $error = (msg) => { throw new Error(msg); };\n\
@@ -353,3 +357,82 @@ runtimeFunctions =
   \// Data constructor\n\
   \const $con = (tag, ...fields) => ({ tag, fields });\n\
   \"
+
+-- | Convert a builtin name to JavaScript expression for common operations.
+-- Returns Nothing if the builtin doesn't have a direct JS mapping.
+builtinToJs :: Text -> [JsExpr] -> Maybe JsExpr
+builtinToJs name args = case name of
+  -- Nat operations
+  "Nat.+" -> Just $ binOp "+" args
+  "Nat.-" -> Just $ jsCall (jsVar "$natSub") args
+  "Nat.*" -> Just $ binOp "*" args
+  "Nat./" -> Just $ binOp "/" args
+  "Nat.mod" -> Just $ binOp "%" args
+  "Nat.<" -> Just $ binOp "<" args
+  "Nat.<=" -> Just $ binOp "<=" args
+  "Nat.>" -> Just $ binOp ">" args
+  "Nat.>=" -> Just $ binOp ">=" args
+  "Nat.==" -> Just $ binOp "===" args
+  -- Int operations
+  "Int.+" -> Just $ binOp "+" args
+  "Int.-" -> Just $ binOp "-" args
+  "Int.*" -> Just $ binOp "*" args
+  "Int./" -> Just $ binOp "/" args
+  "Int.mod" -> Just $ binOp "%" args
+  "Int.<" -> Just $ binOp "<" args
+  "Int.<=" -> Just $ binOp "<=" args
+  "Int.>" -> Just $ binOp ">" args
+  "Int.>=" -> Just $ binOp ">=" args
+  "Int.==" -> Just $ binOp "===" args
+  "Int.negate" -> Just $ JsUnaryOp "-" (head args)
+  "Int.signum" -> Just $ jsCall (jsVar "$signum") args
+  "Int.increment" -> Just $ binOp "+" [head args, JsLit (JsInt 1)]
+  -- Float operations
+  "Float.+" -> Just $ binOp "+" args
+  "Float.-" -> Just $ binOp "-" args
+  "Float.*" -> Just $ binOp "*" args
+  "Float./" -> Just $ binOp "/" args
+  "Float.<" -> Just $ binOp "<" args
+  "Float.<=" -> Just $ binOp "<=" args
+  "Float.>" -> Just $ binOp ">" args
+  "Float.>=" -> Just $ binOp ">=" args
+  "Float.==" -> Just $ binOp "===" args
+  "Float.sqrt" -> Just $ jsCall (jsVar "Math.sqrt") args
+  "Float.abs" -> Just $ jsCall (jsVar "Math.abs") args
+  "Float.ceiling" -> Just $ jsCall (jsVar "Math.ceil") args
+  "Float.floor" -> Just $ jsCall (jsVar "Math.floor") args
+  "Float.round" -> Just $ jsCall (jsVar "Math.round") args
+  "Float.sin" -> Just $ jsCall (jsVar "Math.sin") args
+  "Float.cos" -> Just $ jsCall (jsVar "Math.cos") args
+  "Float.tan" -> Just $ jsCall (jsVar "Math.tan") args
+  "Float.exp" -> Just $ jsCall (jsVar "Math.exp") args
+  "Float.log" -> Just $ jsCall (jsVar "Math.log") args
+  "Float.pow" -> Just $ jsCall (jsVar "Math.pow") args
+  -- Text operations
+  "Text.++" -> Just $ binOp "+" args
+  "Text.size" -> Just $ JsProp (head args) "length"
+  "Text.==" -> Just $ binOp "===" args
+  -- Boolean operations
+  "Boolean.not" -> Just $ JsUnaryOp "!" (head args)
+  -- Universal operations (polymorphic)
+  "Universal.==" -> Just $ jsCall (jsVar "$deepEqual") args
+  "Universal.>" -> Just $ jsCall (jsVar "$greaterThan") args
+  "Universal.<" -> Just $ jsCall (jsVar "$lessThan") args
+  "Universal.<=" -> Just $ jsCall (jsVar "$lessOrEqual") args
+  "Universal.>=" -> Just $ jsCall (jsVar "$greaterOrEqual") args
+  "Universal.compare" -> Just $ jsCall (jsVar "$compare") args
+  -- Nat drop (saturating subtraction)
+  "Nat.drop" -> Just $ jsCall (jsVar "$natSub") args
+  -- Conversions
+  "Nat.toInt" -> Just $ head args -- Both are BigInt
+  "Int.toNat" -> Just $ head args -- Both are BigInt (caller should check >= 0)
+  "Nat.toFloat" -> Just $ jsCall (jsVar "Number") args
+  "Int.toFloat" -> Just $ jsCall (jsVar "Number") args
+  "Nat.toText" -> Just $ jsCall (JsProp (head args) "toString") []
+  "Int.toText" -> Just $ jsCall (JsProp (head args) "toString") []
+  "Float.toText" -> Just $ jsCall (JsProp (head args) "toString") []
+  _ -> Nothing
+  where
+    -- Helper to handle builtin names with special characters
+    binOp op [a, b] = JsBinOp op a b
+    binOp op xs = jsCall (jsVar ("$binOp_" <> Text.filter (/= '.') op)) xs

@@ -26,7 +26,7 @@ module Unison.Runtime.JavaScript.Emit
   )
 where
 
-import Control.Monad (forM_, forM, when, foldM)
+import Control.Monad (foldM, forM, forM_, when)
 import Control.Monad.State.Strict
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -60,11 +60,11 @@ import Unison.Runtime.ANF
     pattern TShift,
     pattern TVar,
   )
-import Unison.Runtime.TypeTags (CTag (..))
 import Unison.Runtime.ANF.POp (POp)
-import Unison.Runtime.JavaScript.Intrinsics (emitPOp, runtimeFunctions)
+import Unison.Runtime.JavaScript.Intrinsics (builtinToJs, emitPOp, runtimeFunctions)
 import Unison.Runtime.JavaScript.Render (RenderConfig, defaultConfig, renderDecl, renderModule)
 import Unison.Runtime.JavaScript.Types
+import Unison.Runtime.TypeTags (CTag (..))
 import Unison.Symbol (Symbol)
 import Unison.Util.EnumContainers qualified as EC
 import Unison.Util.Text qualified as Util.Text
@@ -154,36 +154,45 @@ emitModule cfg mainName group =
       modul = JsModule [] decls [mainName]
    in runtime <> renderModule (ecRenderConfig cfg) modul
 
+-- | Extract bound variables from an ANormal term (peels off TAbs layers)
+peelAbs :: (Var v) => ANormal ref v -> ([v], ANormal ref v)
+peelAbs (ABTN.TAbss vs bd) = (vs, bd)
+
 -- | Emit a SuperGroup as JS declarations
 emitGroup :: (Var v) => Text -> SuperGroup Reference v -> Emit v [JsDecl]
 emitGroup mainName (Rec {group = subgroups, entry = entryFn}) = do
   -- Emit the main entry function
-  let Lambda {conventions = ccs, bound = body} = entryFn
-  let params = zipWith (\idx _ -> "$" <> Text.pack (show idx)) [0 :: Int ..] ccs
-  forM_ (zip params ccs) $ \(pname, _cc) -> do
-    _nm <- freshName pname
-    -- bind parameter to name (simplified - need to handle properly)
-    modify $ \ctx -> ctx {ctxVarNames = Map.empty}
-  stmts <- emitNormal body
+  let Lambda {bound = body} = entryFn
+  -- Peel off the TAbs layers to get parameter variables and the actual body
+  let (paramVars, actualBody) = peelAbs body
+  -- Bind parameter variables to JS names
+  modify $ \ctx -> ctx {ctxVarNames = Map.empty}
+  paramNames <- forM paramVars $ \v -> do
+    name <- bindVar v
+    pure name
+  stmts <- emitNormal actualBody
   let isGen = False -- TODO: detect if generator needed
-  let entryDecl = JsFunctionDecl mainName params stmts isGen
+  let entryDecl = JsFunctionDecl mainName paramNames stmts isGen
 
   -- Emit any mutual recursive functions in the group
-  subDecls <- forM (zip [0 :: Int ..] subgroups) $ \(fnIdx, (varName, Lambda {conventions = fnCcs, bound = fnBody})) -> do
-    let fnName = mainName <> "_" <> Text.pack (show (Var.name varName)) <> "_" <> Text.pack (show fnIdx)
-    let fnParams = zipWith (\pIdx _ -> "$" <> Text.pack (show pIdx)) [0 :: Int ..] fnCcs
+  subDecls <- forM (zip [0 :: Int ..] subgroups) $ \(fnIdx, (varName, Lambda {bound = fnBody})) -> do
+    let fnName = mainName <> "_" <> sanitizeName (Var.name varName) <> "_" <> Text.pack (show fnIdx)
+    let (fnParamVars, fnActualBody) = peelAbs fnBody
     modify $ \ctx -> ctx {ctxVarNames = Map.empty}
-    fnStmts <- emitNormal fnBody
-    pure $ JsFunctionDecl fnName fnParams fnStmts False
+    fnParamNames <- forM fnParamVars $ \v -> do
+      name <- bindVar v
+      pure name
+    fnStmts <- emitNormal fnActualBody
+    pure $ JsFunctionDecl fnName fnParamNames fnStmts False
   pure (entryDecl : subDecls)
 
 -- | Emit ANormal to JS statements
 emitNormal :: forall v. (Var v) => ANormal Reference v -> Emit v [JsStmt]
 emitNormal anf = case anf of
-  -- Let binding
+  -- Let binding (multiple variables)
   TLets _dir vs mems bound body -> do
     boundExpr <- emitNormalExpr bound
-    names <- forM vs $ \v -> freshName (Text.pack (show (Var.name v)))
+    names <- forM vs bindVar  -- Use bindVar to add variables to context
     let bindings = zipWith JsConst names (repeat boundExpr) -- simplified
     bodyStmts <- emitNormal body
     pure $ bindings ++ bodyStmts
@@ -304,8 +313,14 @@ emitApp func args = do
     FVar v -> do
       fnName <- getVarName v
       pure $ JsCall (JsVar fnName) argExprs
-    FComb ref ->
-      pure $ JsCall (JsVar (refToName ref)) argExprs
+    FComb ref -> case ref of
+      -- Try to inline builtin functions to native JS operations
+      Reference.Builtin name ->
+        case builtinToJs name argExprs of
+          Just jsExpr -> pure jsExpr
+          Nothing -> pure $ JsCall (JsVar (refToName ref)) argExprs
+      -- For derived references, just call the function
+      _ -> pure $ JsCall (JsVar (refToName ref)) argExprs
     FCon ref (CTag tag) ->
       pure $ JsCall (JsVar "$con") (JsLit (JsInt (fromIntegral tag)) : argExprs)
     FReq ref (CTag tag) -> do
