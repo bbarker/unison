@@ -26,6 +26,7 @@ module Unison.Runtime.JavaScript.Emit
   )
 where
 
+import Control.Monad (forM_, forM, when, foldM)
 import Control.Monad.State.Strict
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -34,12 +35,12 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Word (Word64)
 import Unison.ABT.Normalized qualified as ABTN
+import Unison.Hash qualified as Hash
 import Unison.Reference (Reference)
 import Unison.Reference qualified as Reference
 import Unison.Runtime.ANF
   ( ANormal,
     Branched (..),
-    CTag (..),
     Func (..),
     Lit (..),
     Mem (..),
@@ -59,6 +60,7 @@ import Unison.Runtime.ANF
     pattern TShift,
     pattern TVar,
   )
+import Unison.Runtime.TypeTags (CTag (..))
 import Unison.Runtime.ANF.POp (POp)
 import Unison.Runtime.JavaScript.Intrinsics (emitPOp, runtimeFunctions)
 import Unison.Runtime.JavaScript.Render (RenderConfig, defaultConfig, renderDecl, renderModule)
@@ -154,44 +156,42 @@ emitModule cfg mainName group =
 
 -- | Emit a SuperGroup as JS declarations
 emitGroup :: (Var v) => Text -> SuperGroup Reference v -> Emit v [JsDecl]
-emitGroup mainName (Rec subgroups fns) = do
-  -- TODO: handle subgroups for mutual recursion
-  case fns of
-    [Lambda ccs body] -> do
-      -- Single function
-      let params = zipWith (\i _ -> "$" <> Text.pack (show i)) [0 :: Int ..] ccs
-      forM_ (zip params ccs) $ \(pname, _cc) -> do
-        n <- freshName pname
-        -- bind parameter to name (simplified - need to handle properly)
-        modify $ \ctx -> ctx {ctxVarNames = Map.empty}
-      stmts <- emitNormal body
-      let isGen = False -- TODO: detect if generator needed
-      pure [JsFunctionDecl mainName params stmts isGen]
-    _ -> do
-      -- Multiple functions (mutual recursion)
-      decls <- forM (zip [0 :: Int ..] fns) $ \(i, Lambda ccs body) -> do
-        let name = mainName <> "_" <> Text.pack (show i)
-        let params = zipWith (\j _ -> "$" <> Text.pack (show j)) [0 :: Int ..] ccs
-        modify $ \ctx -> ctx {ctxVarNames = Map.empty}
-        stmts <- emitNormal body
-        pure $ JsFunctionDecl name params stmts False
-      pure decls
+emitGroup mainName (Rec {group = subgroups, entry = entryFn}) = do
+  -- Emit the main entry function
+  let Lambda {conventions = ccs, bound = body} = entryFn
+  let params = zipWith (\idx _ -> "$" <> Text.pack (show idx)) [0 :: Int ..] ccs
+  forM_ (zip params ccs) $ \(pname, _cc) -> do
+    _nm <- freshName pname
+    -- bind parameter to name (simplified - need to handle properly)
+    modify $ \ctx -> ctx {ctxVarNames = Map.empty}
+  stmts <- emitNormal body
+  let isGen = False -- TODO: detect if generator needed
+  let entryDecl = JsFunctionDecl mainName params stmts isGen
+
+  -- Emit any mutual recursive functions in the group
+  subDecls <- forM (zip [0 :: Int ..] subgroups) $ \(fnIdx, (varName, Lambda {conventions = fnCcs, bound = fnBody})) -> do
+    let fnName = mainName <> "_" <> Text.pack (show (Var.name varName)) <> "_" <> Text.pack (show fnIdx)
+    let fnParams = zipWith (\pIdx _ -> "$" <> Text.pack (show pIdx)) [0 :: Int ..] fnCcs
+    modify $ \ctx -> ctx {ctxVarNames = Map.empty}
+    fnStmts <- emitNormal fnBody
+    pure $ JsFunctionDecl fnName fnParams fnStmts False
+  pure (entryDecl : subDecls)
 
 -- | Emit ANormal to JS statements
 emitNormal :: forall v. (Var v) => ANormal Reference v -> Emit v [JsStmt]
 emitNormal anf = case anf of
   -- Let binding
-  TLets _dir mems bound body -> do
+  TLets _dir vs mems bound body -> do
     boundExpr <- emitNormalExpr bound
-    names <- forM mems $ \_ -> freshName "$v"
+    names <- forM vs $ \v -> freshName (Text.pack (show (Var.name v)))
     let bindings = zipWith JsConst names (repeat boundExpr) -- simplified
     bodyStmts <- emitNormal body
     pure $ bindings ++ bodyStmts
 
   -- Single let binding (common case)
-  TLet _dir _mem v bound body -> do
+  TLet _dir var _mem bound body -> do
     boundExpr <- emitNormalExpr bound
-    name <- bindVar v
+    name <- bindVar var
     bodyStmts <- emitNormal body
     pure $ JsConst name boundExpr : bodyStmts
 
@@ -250,7 +250,7 @@ emitNormal anf = case anf of
     emitMatch scrutExpr branches
 
   -- Effect shift (request an effect)
-  TShift ref body -> do
+  TShift ref _shiftVar body -> do
     modify $ \ctx -> ctx {ctxIsGenerator = True}
     let abilityName = refToName ref
     bodyStmts <- emitNormal body
@@ -432,7 +432,7 @@ refToName :: Reference -> Text
 refToName ref = case ref of
   Reference.Builtin name -> "$builtin_" <> sanitizeName name
   Reference.DerivedId (Reference.Id hash _) ->
-    "$h" <> Text.take 10 (Reference.toBase32HexText hash)
+    "$h" <> Text.take 10 (Hash.toBase32HexText hash)
 
 -- | Sanitize a name for use as a JS identifier
 sanitizeName :: Text -> Text

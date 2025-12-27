@@ -64,6 +64,7 @@ import Unison.Codebase.Editor.HandleInput.Dependencies (handleDependencies)
 import Unison.Codebase.Editor.HandleInput.Dependents (handleDependents)
 import Unison.Codebase.Editor.HandleInput.DiffBranch (handleDiffBranch)
 import Unison.Codebase.Editor.HandleInput.DiffUpdate qualified as DiffUpdate
+import Unison.Codebase.Editor.HandleInput.CompileJs qualified as CompileJs
 import Unison.Codebase.Editor.HandleInput.EditDependents (handleEditDependents)
 import Unison.Codebase.Editor.HandleInput.EditNamespace (handleEditNamespace)
 import Unison.Codebase.Editor.HandleInput.FindAndReplace (handleStructuredFindI, handleStructuredFindReplaceI, handleTextFindI)
@@ -721,6 +722,7 @@ loop e = do
           whenJust (Path.ascend path0) Cli.cd
         Update2I -> handleUpdate2
         DiffUpdateI -> DiffUpdate.handleDiffUpdate
+        CompileJsI outputPath main -> CompileJs.handleCompileJs outputPath main
         UpdateBuiltinsI -> Cli.respond NotImplemented
         UpgradeCommitI -> Cli.returnEarly (Output.Literal "The `upgrade.commit` command has been removed in favor of `update`.")
         UpgradeI libs -> handleUpgrade libs
@@ -892,6 +894,7 @@ inputDescription input =
     UpI {} -> wat
     Update2I -> wat
     DiffUpdateI -> wat
+    CompileJsI {} -> wat
     UpdateBuiltinsI -> wat
     UpgradeCommitI {} -> wat
     UpgradeI {} -> wat

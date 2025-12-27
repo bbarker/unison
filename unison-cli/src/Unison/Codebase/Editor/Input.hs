@@ -155,6 +155,7 @@ data Input
   | DiffBranchI !DiffBranchArg !DiffBranchArg
   | DiffNamespaceI BranchId2 BranchId2 -- old new
   | DiffUpdateI
+  | CompileJsI FilePath (HQ.HashQualified Name)
   | DisplayI OutputLocation (NonEmpty (HQ.HashQualified Name))
   | DocToMarkdownI Name
   | DocsI (NonEmpty Name)

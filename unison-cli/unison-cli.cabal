@@ -65,6 +65,7 @@ library
       Unison.Codebase.Editor.HandleInput.DeleteProject
       Unison.Codebase.Editor.HandleInput.Dependencies
       Unison.Codebase.Editor.HandleInput.Dependents
+      Unison.Codebase.Editor.HandleInput.CompileJs
       Unison.Codebase.Editor.HandleInput.DiffBranch
       Unison.Codebase.Editor.HandleInput.DiffUpdate
       Unison.Codebase.Editor.HandleInput.EditDependents

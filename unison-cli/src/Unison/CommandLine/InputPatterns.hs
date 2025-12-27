@@ -3416,6 +3416,28 @@ makeStandalone =
           <*> handleHashQualifiedNameArg main
       args -> wrongArgsLength "exactly two arguments" args
 
+compileJs :: InputPattern
+compileJs =
+  InputPattern
+    "compile.js"
+    ["js.compile"]
+    I.Visible
+    ( Parameters [("definition to compile", exactDefinitionTermQueryArg), ("output file", filePathArg)] $
+        Optional [] Nothing
+    )
+    ( P.wrapColumn2
+        [ ( "`compile.js main output.js`",
+            "Compiles the given definition to JavaScript and writes it to the specified file."
+          )
+        ]
+    )
+    \case
+      [main, file] ->
+        Input.CompileJsI
+          <$> unsupportedStructuredArgument compileJs "a file name" file
+          <*> handleHashQualifiedNameArg main
+      args -> wrongArgsLength "exactly two arguments" args
+
 createAuthor :: InputPattern
 createAuthor =
   InputPattern
@@ -3873,6 +3895,7 @@ validInputs =
       cd,
       clear,
       clone,
+      compileJs,
       configGet,
       configSet,
       createAuthor,

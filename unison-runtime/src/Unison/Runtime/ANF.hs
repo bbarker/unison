@@ -55,6 +55,7 @@ module Unison.Runtime.ANF
     litRef,
     inlineAlias,
     addDefaultCases,
+    deannotate,
     ANormalF (.., AApv, ACom, ACon, AKon, AReq, APrm, AFOp),
     ANormal,
     RTag,
