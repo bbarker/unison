@@ -1,0 +1,1 @@
+<REPO_ROOT>/result/bin/unison transcript <WORK_DIR>/fixtures/scripts/unison/corpus/reserved-identifier-parse-error.md --codebase-create <WORK_DIR>/codebases/transcript_reserved_identifier_parse_error 

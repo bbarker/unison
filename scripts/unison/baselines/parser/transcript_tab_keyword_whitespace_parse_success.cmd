@@ -1,0 +1,1 @@
+<REPO_ROOT>/result/bin/unison transcript <WORK_DIR>/fixtures/scripts/unison/corpus/tab-keyword-whitespace-parse-success.md --codebase-create <WORK_DIR>/codebases/transcript_tab_keyword_whitespace_parse_success 

@@ -1,0 +1,33 @@
+
+  Transcript will be run on a new, empty codebase.
+Initializing a new codebase in: <TMP_PATH><ID>
+   _____     _             
+  |  |  |___|_|___ ___ ___ 
+  |  |  |   | |_ -| . |   |
+  |_____|_|_|_|___|___|_|_|
+  
+  Running the provided transcript file...
+  
+
+  ❓
+  
+    An error occurred while running the following file: <WORK_DIR>/fixtures/unison-src/transcripts/errors/ucm-hide-error.md
+  
+    ### Transcript parser hidden errors
+    
+    Dangerous scary words\!
+    
+    When an expected error is not encountered in a `ucm :hide` block
+    then the transcript parser should print the stanza
+    and surface a helpful message.
+    
+    ``` ucm :hide :error
+    > history
+    ```
+    
+    🛑
+    
+    The transcript was expecting an error in the stanza above, but did not encounter one.
+    
+  Run `unison --codebase <TMP_PATH><ID>` to do more work with it.
+💾  Wrote <WORK_DIR>/fixtures/unison-src/transcripts/errors/ucm-hide-error.output.md

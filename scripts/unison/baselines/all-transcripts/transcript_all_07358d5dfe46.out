@@ -1,0 +1,37 @@
+
+  Transcript will be run on a new, empty codebase.
+Initializing a new codebase in: <TMP_PATH><ID>
+   _____     _             
+  |  |  |___|_|___ ___ ___ 
+  |  |  |   | |_ -| . |   |
+  |_____|_|_|_|___|___|_|_|
+  
+  Running the provided transcript file...
+  
+
+  ❓
+  
+    An error occurred while running the following file: <WORK_DIR>/fixtures/unison-src/transcripts/errors/obsolete-error-bug.md
+  
+    This transcript will fail, because we’re claiming that the stanza has a bug, but `do.something` errors as expected.
+    
+    ``` ucm :error :bug
+    > do.something
+    ```
+    
+    🎉
+    
+    ## You fixed a bug\!
+    
+    The stanza above marked with `:error :bug` is now failing with
+    
+    ``` 
+    ⚠️
+    I don't know how to do.something. Type `help` or `?` to get
+    help.
+    ```
+    
+    so you can remove `:bug` and close any appropriate Github issues. If the error message is different from the expected error message, open a new issue and reference it in this transcript.
+    
+  Run `unison --codebase <TMP_PATH><ID>` to do more work with it.
+💾  Wrote <WORK_DIR>/fixtures/unison-src/transcripts/errors/obsolete-error-bug.output.md

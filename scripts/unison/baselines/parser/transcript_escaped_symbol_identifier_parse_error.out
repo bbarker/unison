@@ -1,0 +1,60 @@
+
+  Transcript will be run on a new, empty codebase.
+Initializing a new codebase in: <TMP_PATH><ID>
+   _____     _             
+  |  |  |___|_|___ ___ ___ 
+  |  |  |   | |_ -| . |   |
+  |_____|_|_|_|___|___|_|_|
+  
+  Running the provided transcript file...
+  
+
+  ❓
+  
+    An error occurred while running the following file: <WORK_DIR>/fixtures/scripts/unison/corpus/escaped-symbol-identifier-parse-error.md
+  
+    # Escaped Symbol Identifier Parse Error Fixture
+    
+    ``` ucm :hide
+    > builtins.mergeio lib.builtins
+    ```
+    
+    ``` unison
+    use lib.builtins
+    
+    `=` = 42
+    ```
+    
+    🛑
+    
+    The transcript failed due to an error in the stanza above. The error is:
+    
+    ``` 
+    I got confused here:
+    
+        3 | `=` = 42
+    
+    
+    I was surprised to find a `=` here.
+    I was expecting one of these instead:
+    
+    * ability
+    * bang
+    * binding
+    * do
+    * false
+    * force
+    * handle
+    * if
+    * lambda
+    * let
+    * quote
+    * termLink
+    * true
+    * tuple
+    * type
+    * typeLink
+    ```
+    
+  Run `unison --codebase <TMP_PATH><ID>` to do more work with it.
+💾  Wrote <WORK_DIR>/fixtures/scripts/unison/corpus/escaped-symbol-identifier-parse-error.output.md

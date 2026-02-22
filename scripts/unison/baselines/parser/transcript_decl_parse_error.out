@@ -1,0 +1,41 @@
+
+  Transcript will be run on a new, empty codebase.
+Initializing a new codebase in: <TMP_PATH><ID>
+   _____     _             
+  |  |  |___|_|___ ___ ___ 
+  |  |  |   | |_ -| . |   |
+  |_____|_|_|_|___|___|_|_|
+  
+  Running the provided transcript file...
+  
+
+  ❓
+  
+    An error occurred while running the following file: <WORK_DIR>/fixtures/scripts/unison/corpus/declaration-parse-error.md
+  
+    # Declaration Parse Error Fixture
+    
+    ``` ucm :hide
+    > builtins.mergeio lib.builtins
+    ```
+    
+    ``` unison
+    use lib.builtins
+    
+    unique[q9d1rl3aatgsa0cndefhert8i6ps1ol7] type
+    ```
+    
+    🛑
+    
+    The transcript failed due to an error in the stanza above. The error is:
+    
+    ``` 
+    I got confused here:
+    
+        4 | 
+    
+    I was surprised to find an end of section here.
+    ```
+    
+  Run `unison --codebase <TMP_PATH><ID>` to do more work with it.
+💾  Wrote <WORK_DIR>/fixtures/scripts/unison/corpus/declaration-parse-error.output.md

@@ -1,0 +1,15 @@
+
+  Transcript will be run on a new, empty codebase.
+Initializing a new codebase in: <TMP_PATH><ID>
+  ❓
+  
+    An error occurred while parsing the following file: <WORK_DIR>/fixtures/unison-src/transcripts/errors/code-block-parse-error.md
+  
+    <WORK_DIR>/fixtures/unison-src/transcripts/errors/code-block-parse-error.md:2:8:
+      |
+    2 | foo/bar% this uses the wrong delimiter before the UCM command
+      |        ^
+    unexpected '%'
+    expecting '>'
+    
+💾  Wrote <WORK_DIR>/fixtures/unison-src/transcripts/errors/code-block-parse-error.output.md

@@ -1,0 +1,64 @@
+
+🌻
+
+Usage instructions for the Unison Codebase Manager
+You are running version: <VERSION>
+
+To get started just run unison
+
+Use unison [command] --help to show help for a command.
+
+Usage: unison [-v|--version] 
+              [(-c|--codebase CODEBASE/PATH) | 
+                (-C|--codebase-create CODEBASE/PATH)] [--exit] [--lsp-format] 
+              [COMMAND | [--token STRING] [--host STRING] [--port NUMBER] 
+                [--allow-cors-host STRING] [--ui DIR] 
+                [-p|--project project/branch] [--no-file-watch]]
+
+Available options:
+  -h,--help                Show this help text
+  -v,--version             Show version
+  -c,--codebase CODEBASE/PATH
+                           The path to an existing codebase
+  -C,--codebase-create CODEBASE/PATH
+                           The path to a new or existing codebase (one will be
+                           created if there isn't one)
+  --exit                   Exit repl after the command.
+  --lsp-format             [Experimental] Enable formatting of source files via
+                           LSP.
+  --token STRING           API auth token
+  --host STRING            Codebase server host
+  --port NUMBER            Codebase server port
+  --allow-cors-host STRING Host that should be allowed to access api (cors)
+  --ui DIR                 Path to codebase ui root
+  -p,--project project/branch
+                           Launch the UCM session at the provided project and
+                           branch.
+  --no-file-watch          If set, ucm will not respond to changes in unison
+                           files. Instead, you can use the 'load' command.
+
+Available commands:
+  version                  Print the version of unison you're running
+  mcp                      Run the MCP server using stdin/stdout
+  init                     This command has been removed. Use --codebase-create
+                           instead to create a codebase in the specified
+                           directory when starting the UCM.
+  run                      Execute a definition from the codebase, passing on
+                           the provided arguments. To pass flags to your
+                           program, use `run <symbol> -- --my-flag`
+  run.compiled             Execute a definition from a previously compiled file,
+                           passing on the provided arguments. To pass flags to
+                           your program, use `run <file> -- --my-flag`
+  run.file                 Execute a definition from a file, passing on the
+                           provided arguments. To pass flags to your program,
+                           use `run.file <file> -- --my-flag`
+  run.pipe                 Execute a definition from stdin, passing on the
+                           provided arguments. To pass flags to your program,
+                           use `run -- --my-flag`
+  transcript               Execute transcript markdown files
+  transcript.fork          Execute transcript markdown files in a sandboxed
+                           codebase
+  transcript.in-place      Execute transcript markdown files on the specified
+                           (or default) codebase
+  headless                 Runs the codebase server without the command-line
+                           interface.

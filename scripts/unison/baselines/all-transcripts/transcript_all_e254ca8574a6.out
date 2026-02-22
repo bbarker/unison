@@ -1,0 +1,15 @@
+
+  Transcript will be run on a new, empty codebase.
+Initializing a new codebase in: <TMP_PATH><ID>
+  ❓
+  
+    An error occurred while parsing the following file: <WORK_DIR>/fixtures/unison-src/transcripts/errors/invalid-api-requests.md
+  
+    <WORK_DIR>/fixtures/unison-src/transcripts/errors/invalid-api-requests.md:2:1:
+      |
+    2 | DELETE /something/important
+      | ^^^^^^^^^
+    unexpected "DELETE /s"
+    expecting "--", "GET", "POST", "RESPONSE:", or end of input
+    
+💾  Wrote <WORK_DIR>/fixtures/unison-src/transcripts/errors/invalid-api-requests.output.md

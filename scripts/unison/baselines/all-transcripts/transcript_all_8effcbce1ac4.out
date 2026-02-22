@@ -1,0 +1,15 @@
+
+  Transcript will be run on a new, empty codebase.
+Initializing a new codebase in: <TMP_PATH><ID>
+  ❓
+  
+    An error occurred while parsing the following file: <WORK_DIR>/fixtures/unison-src/transcripts/errors/info-string-parse-error.md
+  
+    <WORK_DIR>/fixtures/unison-src/transcripts/errors/info-string-parse-error.md:1:9:
+      |
+    1 | ``` ucm :hode
+      |         ^
+    unexpected ':'
+    expecting ":added-by-ucm", ":bug", ":error", ":hide", ":hide-all", ":show", or newline
+    
+💾  Wrote <WORK_DIR>/fixtures/unison-src/transcripts/errors/info-string-parse-error.output.md

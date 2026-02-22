@@ -1,0 +1,26 @@
+  I created a new codebase for you at
+  <WORK_DIR>/codebases/run_file_print
+   _____     _             
+  |  |  |___|_|___ ___ ___ 
+  |  |  |   | |_ -| . |   |
+  |_____|_|_|_|___|___|_|_|
+  
+  👋 Welcome to Unison!
+  
+  You are running version: <VERSION>
+
+  📚 Read the official docs at https://www.unison-lang.org/docs/
+  
+  Hint: Type 'projects' to list all your projects, or 'project.create' to start
+  something new.
+
+  Loading changes detected in
+  <WORK_DIR>/fixtures/unison-cli-integration/integration-tests/IntegrationTests/print.u.
+
+
+  + print : ∀ _. _ -> ()
+  
+  Run `update` to apply these changes to your codebase.
+
+
+  ()

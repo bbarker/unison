@@ -1,0 +1,41 @@
+
+  Transcript will be run on a new, empty codebase.
+Initializing a new codebase in: <TMP_PATH><ID>
+   _____     _             
+  |  |  |___|_|___ ___ ___ 
+  |  |  |   | |_ -| . |   |
+  |_____|_|_|_|___|___|_|_|
+  
+  Running the provided transcript file...
+  
+
+  ❓
+  
+    An error occurred while running the following file: <WORK_DIR>/fixtures/unison-src/transcripts/errors/missing-result.md
+  
+    ### Transcript parser hidden errors
+    
+    When an error is encountered in a `unison :hide-all` block
+    then the transcript parser should print the stanza
+    and surface a helpful message.
+    
+    ``` unison :hide-all
+    x =
+      y = 24
+    ```
+    
+    🛑
+    
+    The transcript failed due to an error in the stanza above. The error is:
+    
+    ``` 
+    The last element of a block must be an expression, but this is a
+    definition:
+    
+        2 |   y = 24
+    
+    Try adding an expression at the end of the block.
+    ```
+    
+  Run `unison --codebase <TMP_PATH><ID>` to do more work with it.
+💾  Wrote <WORK_DIR>/fixtures/unison-src/transcripts/errors/missing-result.output.md

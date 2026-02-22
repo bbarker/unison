@@ -1,0 +1,7 @@
+phase	iteration	elapsed_ms	rc
+warmup	1	117.865	0
+sample	1	97.159	0
+sample	2	110.887	0
+sample	3	115.152	0
+sample	4	102.759	0
+sample	5	102.542	0

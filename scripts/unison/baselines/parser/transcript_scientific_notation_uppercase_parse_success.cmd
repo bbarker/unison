@@ -1,0 +1,1 @@
+<REPO_ROOT>/result/bin/unison transcript <WORK_DIR>/fixtures/scripts/unison/corpus/scientific-notation-uppercase-parse-success.md --codebase-create <WORK_DIR>/codebases/transcript_scientific_notation_uppercase_parse_success 
