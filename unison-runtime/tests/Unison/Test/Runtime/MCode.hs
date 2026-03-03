@@ -6,8 +6,11 @@
 module Unison.Test.Runtime.MCode where
 
 import Control.Concurrent.STM
+import Control.Monad (forM_)
 import Data.Map.Strict qualified as Map
+import Data.Text qualified as Text
 import EasyTest
+import System.Mem (performMajorGC)
 import Unison.Reference (Reference, Reference' (Builtin))
 import Unison.Runtime.ANF
   ( Cacheability (..),
@@ -68,6 +71,29 @@ testEval s = testEval0 (fmap superNormalize <$> ctx) (superNormalize ll)
         . unannotate
         $ tm s
 
+-- Pending repro: retained cache growth should be bounded after GC.
+cacheGrowthShouldBeBounded :: Test ()
+cacheGrowthShouldBeBounded = scope "cache-growth-should-be-bounded" . pending $ do
+  cc <- io $ baseCCache False
+  baseline <- io $ Map.size <$> readTVarIO (refTm cc)
+  let payload = superNormalize ll
+      (ll, _, _, _, _) =
+        lamLift mempty
+          . splitPatterns builtinDataSpec
+          . unannotate
+          $ tm "if (##Nat.== 1 1) then () else ##bug ()"
+      numRefs :: Int
+      numRefs = 200
+      allowedGrowth :: Int
+      allowedGrowth = 10
+  io $ forM_ [1 .. numRefs] \ix -> do
+    let ref = Builtin ("runtime.cache.growth.pending." <> Text.pack (show ix))
+    _ <- cacheAdd [(ref, CodeRep payload Uncacheable)] cc
+    pure ()
+  io performMajorGC
+  after <- io $ Map.size <$> readTVarIO (refTm cc)
+  expect (after <= baseline + allowedGrowth)
+
 nested :: String
 nested =
   "let\n\
@@ -104,5 +130,6 @@ test =
       scope "nested" $
         testEval nested,
       scope "matching arguments" $
-        testEval matching'arguments
+        testEval matching'arguments,
+      cacheGrowthShouldBeBounded
     ]

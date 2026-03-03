@@ -16,8 +16,6 @@ import Data.Text.IO qualified as Text
 import GHC.IO.Handle (hDuplicate, hDuplicateTo)
 import U.Codebase.Sqlite.Queries qualified as Queries
 import Unison.Auth.CredentialManager qualified as AuthN
-import Unison.Auth.HTTPClient qualified as AuthN
-import Unison.Auth.Tokens qualified as AuthN
 import Unison.Cli.Monad qualified as Cli
 import Unison.Codebase qualified as Codebase
 import Unison.Codebase.Editor.HandleInput qualified as HandleInput
@@ -104,13 +102,10 @@ handleInputMCP projectContext input = do
 
 cliToMCP :: ProjectContext -> (Text -> IO ()) -> Cli.Cli a -> ExceptT Text MCP (Maybe a, CliOutput)
 cliToMCP projCtx onError cli = do
-  MCP.Env {ucmVersion, codebase, runtime, workDir} <- ask
+  MCP.Env {ucmVersion, codebase, runtime, workDir, authenticatedHTTPClient} <- ask
   initialPP <- ExceptT . liftIO $ Codebase.runTransactionExceptT codebase $ do
     ppForProjectContext projCtx
   let credMan = AuthN.globalCredentialManager
-  let tokenProvider :: AuthN.TokenProvider
-      tokenProvider = AuthN.newTokenProvider credMan
-  authenticatedHTTPClient <- AuthN.newAuthenticatedHTTPClient tokenProvider ucmVersion
   outputVar <- newTVarIO Seq.empty
   errorsVar <- newTVarIO Seq.empty
   sourceCodeUpdatesVar <- newTVarIO Seq.empty
