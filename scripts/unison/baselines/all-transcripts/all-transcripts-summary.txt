@@ -1,0 +1,8 @@
+profile=all-transcripts
+total_cases=200
+matched_cases=200
+mismatched_cases=0
+max_cases=200
+map_file=all-transcripts-map.tsv
+mismatch_file=all-transcripts-mismatches.txt
+expected_precedence=recorded(update-baseline) > heuristic-unstable > baseline > heuristic

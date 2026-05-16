@@ -1,0 +1,40 @@
+  I created a new codebase for you at
+  <WORK_DIR>/codebases/run_pipe_print
+   _____     _             
+  |  |  |___|_|___ ___ ___ 
+  |  |  |   | |_ -| . |   |
+  |_____|_|_|_|___|___|_|_|
+  
+  👋 Welcome to Unison!
+  
+  You are running version: <VERSION>
+
+  📚 Read the official docs at https://www.unison-lang.org/docs/
+  
+  Hint: Type 'projects' to list all your projects, or 'project.create' to start
+  something new.
+
+  Loading changes detected in <standard input>.
+
+
+  
+    ❓
+    
+    I couldn't resolve any of these names:
+    
+        1 | print : '{IO, Exception} ()
+    
+    
+    Name        Type   Suggestions
+                       
+    Exception   type   No matches
+                       
+    IO          type   No matches
+  
+
+  😶
+  
+  I looked for a function `print` in the most recently typechecked file and
+  codebase but couldn't find one. It has to have the type:
+  
+    print : '{##IO, #4n0fgs00hp} result

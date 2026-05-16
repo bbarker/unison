@@ -1,0 +1,36 @@
+
+  Transcript will be run on a new, empty codebase.
+Initializing a new codebase in: <TMP_PATH><ID>
+   _____     _             
+  |  |  |___|_|___ ___ ___ 
+  |  |  |   | |_ -| . |   |
+  |_____|_|_|_|___|___|_|_|
+  
+  Running the provided transcript file...
+  
+
+  ❓
+  
+    An error occurred while running the following file: <WORK_DIR>/fixtures/scripts/unison/corpus/load-file-parse-error.md
+  
+    # Load File Parse Error Fixture
+    
+    ``` ucm :hide
+    > builtins.mergeio lib.builtins
+    ```
+    
+    ``` ucm
+    > load ./scripts/unison/corpus/fixtures/load-file-parse-error.u
+    ```
+    
+    🛑
+    
+    The transcript failed due to an error in the stanza above. The error is:
+    
+    ``` 
+    I expected a block after this (in red), but there wasn't one.  Maybe check your indentation:
+        3 |   x =
+    ```
+    
+  Run `unison --codebase <TMP_PATH><ID>` to do more work with it.
+💾  Wrote <WORK_DIR>/fixtures/scripts/unison/corpus/load-file-parse-error.output.md

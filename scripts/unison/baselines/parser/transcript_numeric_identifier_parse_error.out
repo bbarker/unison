@@ -1,0 +1,48 @@
+
+  Transcript will be run on a new, empty codebase.
+Initializing a new codebase in: <TMP_PATH><ID>
+   _____     _             
+  |  |  |___|_|___ ___ ___ 
+  |  |  |   | |_ -| . |   |
+  |_____|_|_|_|___|___|_|_|
+  
+  Running the provided transcript file...
+  
+
+  ❓
+  
+    An error occurred while running the following file: <WORK_DIR>/fixtures/scripts/unison/corpus/numeric-identifier-parse-error.md
+  
+    # Numeric Identifier Parse Error Fixture
+    
+    ``` ucm :hide
+    > builtins.mergeio lib.builtins
+    ```
+    
+    ``` unison
+    use lib.builtins
+    
+    1main = 42
+    ```
+    
+    🛑
+    
+    The transcript failed due to an error in the stanza above. The error is:
+    
+    ``` 
+    This looks like the start of an expression here 
+    
+        3 | 1main = 42
+    
+    but at the file top-level, I expect one of the following:
+    
+      - A binding, like 1 = 42 OR
+                        1 : Nat
+                        1 = 42
+      - A watch expression, like > 1 + 1
+      - An `ability` declaration, like unique ability Foo where ...
+      - A `type` declaration, like structural type Optional a = None | Some a
+    ```
+    
+  Run `unison --codebase <TMP_PATH><ID>` to do more work with it.
+💾  Wrote <WORK_DIR>/fixtures/scripts/unison/corpus/numeric-identifier-parse-error.output.md

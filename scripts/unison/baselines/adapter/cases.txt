@@ -1,0 +1,7 @@
+help
+version
+transcript_adapter_pull
+transcript_adapter_lib_install
+transcript_adapter_add_update
+transcript_adapter_add_empty
+transcript_adapter_update_empty

@@ -1,0 +1,15 @@
+  I created a new codebase for you at
+  <WORK_DIR>/codebases/transcript_fork_integration
+  Transcript will be run on a copy of the codebase at:
+  
+    <WORK_DIR>/codebases/transcript_fork_integration
+
+   _____     _             
+  |  |  |___|_|___ ___ ___ 
+  |  |  |   | |_ -| . |   |
+  |_____|_|_|_|___|___|_|_|
+  
+  Running the provided transcript file...
+  
+
+💾  Wrote <WORK_DIR>/fixtures/unison-cli-integration/integration-tests/IntegrationTests/transcript.output.md

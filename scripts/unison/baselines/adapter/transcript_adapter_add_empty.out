@@ -1,0 +1,38 @@
+
+  Transcript will be run on a new, empty codebase.
+Initializing a new codebase in: <TMP_PATH><ID>
+   _____     _             
+  |  |  |___|_|___ ___ ___ 
+  |  |  |   | |_ -| . |   |
+  |_____|_|_|_|___|___|_|_|
+  
+  Running the provided transcript file...
+  
+
+  ❓
+  
+    An error occurred while running the following file: <WORK_DIR>/fixtures/scripts/unison/corpus/adapter-add-empty.md
+  
+    # Adapter Add Empty Corpus Fixture
+    
+    ``` ucm
+    > add
+    ```
+    
+    🛑
+    
+    The transcript failed due to an error in the stanza above. The error is:
+    
+    ``` 
+    😶
+    
+    There's nothing for me to add right now.
+    
+    Hint: I'm currently watching for definitions in .u files under
+          the 〈redacted〉 directory. Make sure you've updated
+          something there before using the `update` command, or use
+          `load` to load a file explicitly.
+    ```
+    
+  Run `unison --codebase <TMP_PATH><ID>` to do more work with it.
+💾  Wrote <WORK_DIR>/fixtures/scripts/unison/corpus/adapter-add-empty.output.md

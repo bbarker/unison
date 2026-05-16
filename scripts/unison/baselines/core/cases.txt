@@ -1,0 +1,17 @@
+help
+version
+run_file_print
+run_pipe_print
+transcript_integration
+transcript_fork_integration
+run_compiled_integration_main
+transcript_hello
+transcript_round_trip
+transcript_parse_error
+transcript_decl_prefixes
+transcript_decl_multiline
+transcript_decl_tight_equals
+transcript_decl_parse_error
+transcript_load_file_success
+transcript_load_file_missing
+transcript_load_file_parse_error

@@ -1,0 +1,207 @@
+
+  Transcript will be run on a new, empty codebase.
+Initializing a new codebase in: <TMP_PATH><ID>
+   _____     _             
+  |  |  |___|_|___ ___ ___ 
+  |  |  |   | |_ -| . |   |
+  |_____|_|_|_|___|___|_|_|
+  
+  Running the provided transcript file...
+  
+
+  ❓
+  
+    An error occurred while running the following file: <WORK_DIR>/fixtures/unison-src/transcripts/idempotent/fix-5612.md
+  
+    ``` ucm
+    scratch/main> builtins.mergeio lib.builtin
+    
+      Done.
+    ```
+    
+    ``` unison
+    conflicted : Nat
+    conflicted = 100
+    
+    xxx : Text
+    xxx = "xxx"
+    
+    yyy : Text
+    yyy = xxx ++ "yyy"
+    
+    zzz : Text
+    zzz = yyy ++ "zzz"
+    ```
+    
+    ``` ucm :added-by-ucm
+      Loading changes detected in scratch.u.
+    
+      + conflicted : Nat
+      + xxx        : Text
+      + yyy        : Text
+      + zzz        : Text
+    
+      Run `update` to apply these changes to your codebase.
+    ```
+    
+    ``` ucm
+    scratch/main> add
+    
+      Done.
+    
+    scratch/main> branch topic
+    
+      Done. I've created the topic branch based off of main.
+    
+      Tip: To merge your work back into the main branch, first
+           `switch /main` then `merge /topic`.
+    ```
+    
+    ``` unison
+    conflicted : Nat
+    conflicted = 200
+    ```
+    
+    ``` ucm :added-by-ucm
+      Loading changes detected in scratch.u.
+    
+      ~ conflicted : Nat
+    
+      ~ (modified)
+    
+      Run `update` to apply these changes to your codebase.
+    ```
+    
+    ``` ucm
+    scratch/topic> update
+    
+      Done.
+    
+    scratch/main> switch /main
+    ```
+    
+    ``` unison
+    conflicted : Nat
+    conflicted = 300
+    
+    xxx : Text
+    xxx = "xxx2"
+    
+    zzz : Text
+    zzz = yyy ++ "zzz2"
+    ```
+    
+    ``` ucm :added-by-ucm
+      Loading changes detected in scratch.u.
+    
+      ~ conflicted : Nat
+      ~ xxx        : Text
+      ~ zzz        : Text
+    
+      ~ (modified)
+    
+      Run `update` to apply these changes to your codebase.
+    ```
+    
+    ``` ucm
+    scratch/main> update
+    
+      Done.
+    ```
+    
+    `merge` used to put `zzz` in the namespace with a nameless dependency on the old `yyy`. Now, it properly puts it in the
+    scratch file.
+    
+    ``` ucm :error
+    scratch/main> merge /topic
+    
+      I couldn't automatically merge scratch/topic into
+      scratch/main. However, I've added the definitions that need
+      attention to the top of scratch.u.
+    
+      When you're done, you can run
+    
+        update
+    
+      to merge your changes back into main and delete the temporary
+      branch. Or, if you decide to cancel the merge instead, you can
+      run
+    
+        cancel
+    
+      to delete the temporary branch and switch back to main.
+    ```
+    
+    ``` unison :added-by-ucm scratch.u
+    -- scratch/main
+    conflicted : Nat
+    conflicted = 300
+    
+    -- scratch/topic
+    conflicted : Nat
+    conflicted = 200
+    
+    -- The definitions below are not conflicted, but they each depend on one or more
+    -- conflicted definitions above.
+    
+    yyy : Text
+    yyy =
+      use Text ++
+      xxx ++ "yyy"
+    
+    zzz : Text
+    zzz =
+      use Text ++
+      yyy ++ "zzz2"
+    
+    ```
+    
+    -----
+    
+    ``` ucm
+    scratch/main> project.delete scratch
+    
+    scratch/main> builtins.mergeio lib.builtin
+    
+      Done.
+    ```
+    
+    ``` unison
+    conflicted : Nat
+    conflicted = 100
+    
+    xxx : Text
+    xxx = "xxx"
+    
+    yyy : Text
+    yyy = xxx ++ "yyy"
+    ```
+    
+    ``` ucm
+    scratch/main> add
+      Okay, I'm searching the branch for code that needs to be
+      updated...
+      Done.
+    scratch/main> branch topic
+      Done. I've created the topic branch based off of main.
+      Tip: To merge your work back into the main branch, first
+           `switch /main` then `merge /topic`.
+    ```
+    
+    🛑
+    
+    The transcript failed due to an error in the stanza above. The error is:
+    
+    ``` 
+    😶
+    
+    There's nothing for me to add right now.
+    
+    Hint: I'm currently watching for definitions in .u files under
+          the 〈redacted〉 directory. Make sure you've updated
+          something there before using the `update` command, or use
+          `load` to load a file explicitly.
+    ```
+    
+  Run `unison --codebase <TMP_PATH><ID>` to do more work with it.
+💾  Wrote <WORK_DIR>/fixtures/unison-src/transcripts/idempotent/fix-5612.output.md

@@ -1,0 +1,3 @@
+profile=adapter
+updated_utc=2026-02-09T03:44:16Z
+binary=/home/bbarker/workspace/unison/result/bin/unison

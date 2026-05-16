@@ -1,0 +1,20 @@
+
+  Transcript will be run on a new, empty codebase.
+Initializing a new codebase in: <TMP_PATH><ID>
+   _____     _             
+  |  |  |___|_|___ ___ ___ 
+  |  |  |   | |_ -| . |   |
+  |_____|_|_|_|___|___|_|_|
+  
+  Running the provided transcript file...
+  
+
+hello world!
+🌹
+🦄 ☁️  🌈
+
+hello world!
+🌹
+🦄 ☁️  🌈
+
+💾  Wrote <WORK_DIR>/fixtures/unison-src/transcripts/idempotent/fix1800.output.md

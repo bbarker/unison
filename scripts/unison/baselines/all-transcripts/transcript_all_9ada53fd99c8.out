@@ -1,0 +1,132 @@
+
+  Transcript will be run on a new, empty codebase.
+Initializing a new codebase in: <TMP_PATH><ID>
+   _____     _             
+  |  |  |___|_|___ ___ ___ 
+  |  |  |   | |_ -| . |   |
+  |_____|_|_|_|___|___|_|_|
+  
+  Running the provided transcript file...
+  
+
+  ❓
+  
+    An error occurred while running the following file: <WORK_DIR>/fixtures/unison-src/transcripts/idempotent/cancel.md
+  
+    # The `cancel` command.
+    
+    ## `cancel` cancels an in-progress update.
+    
+    ``` ucm :hide
+    scratch/main> builtins.mergeio lib.builtin
+    ```
+    
+    ``` unison
+    foo = 17
+    bar = foo + foo
+    ```
+    
+    ``` ucm :added-by-ucm
+      Loading changes detected in scratch.u.
+    
+      + bar : Nat
+      + foo : Nat
+    
+      Run `update` to apply these changes to your codebase.
+    ```
+    
+    ``` ucm
+    scratch/main> update
+    
+      Done.
+    ```
+    
+    ``` unison
+    foo = +17
+    ```
+    
+    ``` ucm :added-by-ucm
+      Loading changes detected in scratch.u.
+    
+      ~ foo : Int
+    
+      ~ (modified)
+    
+      Run `update` to apply these changes to your codebase.
+    ```
+    
+    ``` ucm :error
+    scratch/main> update
+    
+      I couldn't complete the update, because some existing
+      definitions would no longer typecheck.
+    
+      I've created a temporary branch and added the affected
+      definitions to scratch.u, where you can fix them up or remove
+      any that are obsolete.
+    
+      Once you're happy with the results, use `update` to merge them
+      back into main, or `cancel` if you change your mind.
+    ```
+    
+    ``` unison :added-by-ucm scratch.u
+    foo = +17
+    
+    -- The definitions below no longer typecheck with the changes above.
+    -- Please fix the errors and try `update` again.
+    
+    bar : Nat
+    bar =
+      use Nat +
+      foo + foo
+    
+    ```
+    
+    ``` ucm
+    scratch/update-main> cancel
+    
+    scratch/main> branches
+    
+           Branch   Remote branch
+      1.   main     
+    ```
+    
+    ``` ucm :hide
+    scratch/main> project.delete scratch
+    ```
+    
+    ## `cancel` cancels an in-progress upgrade.
+    
+    ``` ucm :hide
+    scratch/main> builtins.mergeio lib.builtin
+    ```
+    
+    ``` unison
+    foo1 = 17
+    foo2 = +17
+    bar = foo1 + foo1
+    ```
+    
+    ``` ucm
+    scratch/main> update
+      Okay, I'm searching the branch for code that needs to be
+      updated...
+      Done.
+    scratch/main> move foo1 lib.old.foo
+      Done.
+    scratch/main> move foo2 lib.new.foo
+      Done.
+    ```
+    
+    🛑
+    
+    The transcript failed due to an error in the stanza above. The error is:
+    
+    ``` 
+    ⚠️
+    
+    There is no term, type, or namespace at foo1.
+    ```
+    
+  Run `unison --codebase <TMP_PATH><ID>` to do more work with it.
+💾  Wrote <WORK_DIR>/fixtures/unison-src/transcripts/idempotent/cancel.output.md
