@@ -1,5 +1,6 @@
 module Unison.Merge.Render
-  ( renderUnisonFiles,
+  ( printedNames,
+    renderUnisonFiles,
   )
 where
 
@@ -114,18 +115,20 @@ renderUnisonFiles authors declNameLookups defnsByName hydratedDefns libdepsNames
 makePrettyPrintEnv :: ThreeWay Names -> Updated Names -> PrettyPrintEnvDecl
 makePrettyPrintEnv defns libdeps =
   PPED.makePPED
-    ( PPE.namer
-        ( Names.preferring
-            -- Here it might be slightly more comfortable to Alice if we prefer her names and _her_ libdeps, not the
-            -- combined Alice+Bob libdep, because that might bring in a Bob name that Alice isn't yet familiar with
-            -- (even though it will be in her merge result at the end). However, that would require a bit of simple
-            -- refactoring (just need to delay the combining of libdeps until at least here), and doesn't seem worth it
-            -- over this quick fix of just "prefer Alice + any libdep name over names that only Bob's project has".
-            (Names.preferring (defns.alice <> libdeps.new) defns.bob)
-            (defns.lca <> libdeps.old)
-        )
-    )
+    (PPE.namer (printedNames defns libdeps))
     (PPE.suffixifyByName (fold defns <> libdeps.new))
+
+-- | The names a definition is printed with.
+printedNames :: ThreeWay Names -> Updated Names -> Names
+printedNames defns libdeps =
+  Names.preferring
+    -- Here it might be slightly more comfortable to Alice if we prefer her names and _her_ libdeps, not the
+    -- combined Alice+Bob libdep, because that might bring in a Bob name that Alice isn't yet familiar with
+    -- (even though it will be in her merge result at the end). However, that would require a bit of simple
+    -- refactoring (just need to delay the combining of libdeps until at least here), and doesn't seem worth it
+    -- over this quick fix of just "prefer Alice + any libdep name over names that only Bob's project has".
+    (Names.preferring (defns.alice <> libdeps.new) defns.bob)
+    (defns.lca <> libdeps.old)
 
 renderConflictsAndDependents ::
   TwoWay DeclNameLookup ->
