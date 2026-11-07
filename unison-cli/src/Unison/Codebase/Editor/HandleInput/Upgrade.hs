@@ -23,6 +23,7 @@ import TextBuilder qualified
 import U.Codebase.Sqlite.DbId (ProjectId)
 import U.Codebase.Sqlite.Project (Project (..))
 import U.Util.Text qualified as Text (unsafeToInt)
+import Unison.ABT qualified as ABT
 import Unison.Cli.Monad (Cli)
 import Unison.Cli.Monad qualified as Cli
 import Unison.Cli.MonadUtils qualified as Cli
@@ -30,16 +31,19 @@ import Unison.Cli.Pretty qualified as Pretty
 import Unison.Cli.ProjectUtils qualified as Cli
 import Unison.Cli.ScratchFile qualified as ScratchFile
 import Unison.Cli.UpdateUtils (getNamespaceDependentsOf, hydrateRefs, makeUniqueTypeGuids, nameHydratedRefIds, parseAndTypecheck, subtractDependents)
+import Unison.Codebase (Codebase)
 import Unison.Codebase qualified as Codebase
 import Unison.Codebase.Branch (Branch0)
 import Unison.Codebase.Branch qualified as Branch
 import Unison.Codebase.Editor.HandleInput.Branch (CreateFrom (..))
 import Unison.Codebase.Editor.HandleInput.Branch qualified as HandleInput.Branch
-import Unison.Codebase.Editor.HandleInput.Update2 (typecheckedUnisonFileToBranchUpdates)
+import Unison.Codebase.Editor.HandleInput.Update2 (parseAndTypecheckRetyped, typecheckedUnisonFileToBranchUpdates)
 import Unison.Codebase.Editor.Output qualified as Output
 import Unison.Codebase.Path qualified as Path
 import Unison.Codebase.ProjectPath qualified as PP
 import Unison.CommandLine.InputPatterns qualified as InputPatterns
+import Unison.DataDeclaration (Decl)
+import Unison.DataDeclaration qualified as Decl
 import Unison.DeclCoherencyCheck qualified as DeclCoherencyCheck
 import Unison.DeclNameLookup (DeclNameLookup (..))
 import Unison.HashQualifiedPrime qualified as HQ'
@@ -50,22 +54,33 @@ import Unison.NameSegment qualified as NameSegment
 import Unison.NameSegment.Internal (NameSegment (NameSegment))
 import Unison.Names qualified as Names
 import Unison.NamesUtils qualified as NamesUtils
+import Unison.Parser.Ann (Ann)
 import Unison.Prelude
 import Unison.PrettyPrintEnv qualified as PPE
 import Unison.PrettyPrintEnv.Names qualified as PPE
 import Unison.PrettyPrintEnvDecl (PrettyPrintEnvDecl (..))
 import Unison.PrettyPrintEnvDecl qualified as PPED
 import Unison.Project (ProjectBranchName)
-import Unison.Reference (TermReference, TermReferenceId, TypeReference, TypeReferenceId)
+import Unison.Reference (Reference' (ReferenceDerived), TermReference, TermReferenceId, TypeReference, TypeReferenceId)
+import Unison.Reference qualified as Reference
 import Unison.Referent (Referent)
 import Unison.Referent qualified as Referent
 import Unison.Sqlite (Transaction)
+import Unison.Symbol (Symbol)
 import Unison.Syntax.FilePrinter (renderDefnsForUnisonFile)
 import Unison.Syntax.NameSegment qualified as NameSegment (toEscapedText)
+import Unison.Term (Term)
+import Unison.Term qualified as Term
+import Unison.Type (Type)
+import Unison.Type qualified as Type
 import Unison.UnconflictedLocalDefnsView qualified
+import Unison.UnisonFile (TypecheckedUnisonFile)
+import Unison.UnisonFile qualified as UF
+import Unison.UnisonFile.Propagate
 import Unison.Util.Alphabetical (sortAlphabeticallyOn)
+import Unison.Util.BiMultimap (BiMultimap)
 import Unison.Util.BiMultimap qualified as BiMultimap
-import Unison.Util.Defns (Defns (..), DefnsF, zipDefnsWith)
+import Unison.Util.Defns (Defns (..), DefnsF, defnsAreEmpty, zipDefnsWith)
 import Unison.Util.Map qualified as Map
 import Unison.Util.Pretty (ColorText, Pretty)
 import Unison.Util.Pretty qualified as Pretty
@@ -192,69 +207,102 @@ handleUpgrade1 namePairs = do
 
       pure (declNameLookup, dependents, dependentsRefs, hydratedDependents1)
 
+  let ppe =
+        PPED.leftBiased
+          [ makeOldDepPPE upgradeInfos currentDeepDefnsSansOlds,
+            PPED.makePPED
+              (PPE.namer (Names.fromUnconflictedReferenceIds dependents))
+              (PPE.suffixifyByName (Names.fromRelations currentDeepDefnsSansOlds)),
+            PPED.makePPED
+              (PPE.hqNamer 10 (Names.fromRelations currentDeepDefnsSansOlds))
+              (PPE.suffixifyByHash (Names.fromRelations currentDeepDefnsSansOlds))
+          ]
+
   let prettyUnisonFile =
         makePrettyUnisonFile $
           renderDefnsForUnisonFile
             declNameLookup
-            ( PPED.leftBiased
-                [ makeOldDepPPE upgradeInfos currentDeepDefnsSansOlds,
-                  PPED.makePPED
-                    (PPE.namer (Names.fromUnconflictedReferenceIds dependents))
-                    (PPE.suffixifyByName (Names.fromRelations currentDeepDefnsSansOlds)),
-                  PPED.makePPED
-                    (PPE.hqNamer 10 (Names.fromRelations currentDeepDefnsSansOlds))
-                    (PPE.suffixifyByHash (Names.fromRelations currentDeepDefnsSansOlds))
-                ]
-            )
+            ppe
             Set.empty
             (over (#terms . Lens.mapped) snd hydratedDependents)
 
   parsingEnv <-
     Cli.makeParsingEnv pp (Names.fromRelations currentDeepDefnsSansOlds)
 
-  typecheckedUnisonFile <- do
-    parseAndTypecheck prettyUnisonFile parsingEnv & onNothingM do
-      uniqueTypeGuidsByName <-
-        Cli.runTransaction (makeUniqueTypeGuids (BiMultimap.range unconflictedView.defns.types))
+  -- Dependents that use nothing whose type changed take their new references without being typechecked again. The
+  -- rest are typechecked the way the slow path below does it, with every dependent type and the named terms printed.
+  propagated <-
+    if defnsAreEmpty dependents || typecheckDependentsAlways
+      then pure Nothing
+      else
+        propagateUpgrade
+          env.codebase
+          unconflictedView.defns
+          upgradeInfos
+          (upgradeInfosToDependencies upgradeInfos (Branch.deepDefnsRefs currentNamespaceSansOlds0))
+          hydratedDependents
+          ( \retyped names ->
+              parseAndTypecheckRetyped
+                retyped
+                ( makePrettyUnisonFile $
+                    renderDefnsForUnisonFile
+                      declNameLookup
+                      ppe
+                      Set.empty
+                      (Defns (snd <$> Map.restrictKeys hydratedDependents.terms names) hydratedDependents.types)
+                )
+                parsingEnv
+          )
 
-      (_, temporaryBranch) <-
-        HandleInput.Branch.createBranch
-          (textualDescriptionOfUpgrade upgradeInfos)
-          ( CreateFrom'Upgrade
-              (pp.branch, Branch.headHash currentNamespace, uniqueTypeGuidsByName)
-              ( unconflictedView.defns
-                  & NamesUtils.byName
-                  & subtractDependents dependentsRefs
-                  & Branch.fromUnconflictedDefns
-                  & Branch.setLibdeps
-                    (Branch.getAt0 (Path.singleton NameSegment.libSegment) currentNamespaceSansOlds0)
-                  & (`Branch.cons` currentNamespace)
-              )
+  typecheckedUnisonFile <- do
+    ( case propagated of
+        Just (Propagated'File file) -> pure (Just file)
+        -- A dependent that fails to typecheck against the types the others keep fails in the whole file too
+        Just Propagated'Failed -> pure Nothing
+        Nothing -> parseAndTypecheck prettyUnisonFile parsingEnv
+      )
+      & onNothingM do
+        uniqueTypeGuidsByName <-
+          Cli.runTransaction (makeUniqueTypeGuids (BiMultimap.range unconflictedView.defns.types))
+
+        (_, temporaryBranch) <-
+          HandleInput.Branch.createBranch
+            (textualDescriptionOfUpgrade upgradeInfos)
+            ( CreateFrom'Upgrade
+                (pp.branch, Branch.headHash currentNamespace, uniqueTypeGuidsByName)
+                ( unconflictedView.defns
+                    & NamesUtils.byName
+                    & subtractDependents dependentsRefs
+                    & Branch.fromUnconflictedDefns
+                    & Branch.setLibdeps
+                      (Branch.getAt0 (Path.singleton NameSegment.libSegment) currentNamespaceSansOlds0)
+                    & (`Branch.cons` currentNamespace)
+                )
+            )
+            pp.project
+            (findTemporaryBranchName pp.project.projectId ((\info -> (info.oldName, info.newName)) <$> upgradeInfos))
+        scratchFilePath <-
+          ScratchFile.writeActionScratchFile
+            "upgrade"
+            (foldMap (\info -> [NameSegment.toUnescapedText info.oldName, "to", NameSegment.toUnescapedText info.newName]) upgradeInfos)
+            ( into @Text pp.project.name
+                : into @Text pp.branch.name
+                : into @Text (Branch.headHash currentNamespace)
+                : foldMap (\info -> [NameSegment.toUnescapedText info.oldName, NameSegment.toUnescapedText info.newName]) upgradeInfos
+            )
+            (Pretty.toPlain 80 prettyUnisonFile)
+        Cli.returnEarly
+          ( Output.UpgradeFailure
+              Output.ScratchFileHandoff
+                { action = "upgrade",
+                  scratchFile = scratchFilePath,
+                  temporaryBranch,
+                  baseBranch = pp.branch.name,
+                  project = pp.project.name,
+                  loadFirst = isNothing env.watchState
+                }
+              ((\info -> (info.oldName, info.newName)) <$> upgradeInfos)
           )
-          pp.project
-          (findTemporaryBranchName pp.project.projectId ((\info -> (info.oldName, info.newName)) <$> upgradeInfos))
-      scratchFilePath <-
-        ScratchFile.writeActionScratchFile
-          "upgrade"
-          (foldMap (\info -> [NameSegment.toUnescapedText info.oldName, "to", NameSegment.toUnescapedText info.newName]) upgradeInfos)
-          ( into @Text pp.project.name
-              : into @Text pp.branch.name
-              : into @Text (Branch.headHash currentNamespace)
-              : foldMap (\info -> [NameSegment.toUnescapedText info.oldName, NameSegment.toUnescapedText info.newName]) upgradeInfos
-          )
-          (Pretty.toPlain 80 prettyUnisonFile)
-      Cli.returnEarly
-        ( Output.UpgradeFailure
-            Output.ScratchFileHandoff
-              { action = "upgrade",
-                scratchFile = scratchFilePath,
-                temporaryBranch,
-                baseBranch = pp.branch.name,
-                project = pp.project.name,
-                loadFirst = isNothing env.watchState
-              }
-            ((\info -> (info.oldName, info.newName)) <$> upgradeInfos)
-        )
 
   branchUpdates <-
     Cli.runTransactionWithRollback \abort -> do
@@ -299,6 +347,157 @@ handleUpgrade1 namePairs = do
           : concatMap
             (\info -> [NameSegment.toEscapedText info.oldName, NameSegment.toEscapedText info.newName])
             (toList infos)
+
+-- | What an upgrade does to the references a dependent may make: where each one goes, and the ones to leave to the
+-- printer. Those have no one destination (a name gone from the new version, or two names going separate ways), or are
+-- types whose kind could have changed, which a substitution can't check.
+data Upgraded = Upgraded
+  { terms :: Map TermReference TermReference,
+    types :: Map TypeReference TypeReference,
+    printed :: DefnsF Set TermReference TypeReference
+  }
+
+-- | @upgraded codebase infos references@ works out what the upgrade does to @references@, by name, as printing and
+-- parsing does.
+upgraded ::
+  Codebase IO Symbol Ann ->
+  List.NonEmpty UpgradeInfo ->
+  DefnsF Set TermReference TypeReference ->
+  Transaction Upgraded
+upgraded codebase infos references = do
+  let destinationOf :: (Ord ref) => (Defns (Relation Referent Name) (Relation TypeReference Name) -> Relation ref Name) -> ref -> Maybe ref
+      destinationOf which ref =
+        case [(info, names) | info <- toList infos, let names = Relation.lookupDom ref (which info.oldLocalDefns), not (Set.null names)] of
+          [(info, names)] ->
+            traverse (\name -> Set.asSingleton (Relation.lookupRan name (which info.newLocalDefns))) (Set.toList names)
+              >>= Set.asSingleton . Set.fromList
+          _ -> Nothing
+
+  let termDestination :: TermReference -> Maybe TermReference
+      termDestination ref = do
+        ReferenceDerived _ <- Just ref
+        Referent.Ref new <- destinationOf (.terms) (Referent.Ref ref)
+        pure new
+
+  -- A type's kind can't have changed if it has no parameters and doesn't switch between data and ability
+  let sameKind :: TypeReference -> TypeReference -> Transaction Bool
+      sameKind (ReferenceDerived old) (ReferenceDerived new) = do
+        decls <- (,) <$> Codebase.getTypeDeclaration codebase old <*> Codebase.getTypeDeclaration codebase new
+        pure case decls of
+          (Just oldDecl, Just newDecl) ->
+            null (Decl.bound (Decl.asDataDecl oldDecl))
+              && null (Decl.bound (Decl.asDataDecl newDecl))
+              && isLeft oldDecl == isLeft newDecl
+          _ -> False
+      sameKind _ _ = pure False
+
+  typeDestinations <-
+    for (Set.toList references.types) \ref ->
+      case destinationOf (.types) ref of
+        Nothing -> pure (ref, Nothing)
+        Just new -> do
+          same <- sameKind ref new
+          pure (ref, if same then Just new else Nothing)
+
+  let termDestinations = [(ref, termDestination ref) | ref <- Set.toList references.terms]
+
+  pure
+    Upgraded
+      { terms = Map.fromList [(ref, new) | (ref, Just new) <- termDestinations],
+        types = Map.fromList [(ref, new) | (ref, Just new) <- typeDestinations],
+        printed =
+          Defns
+            { terms = Set.fromList [ref | (ref, Nothing) <- termDestinations],
+              types = Set.fromList [ref | (ref, Nothing) <- typeDestinations]
+            }
+      }
+
+-- | @propagateUpgrade codebase namespace infos dependencies dependents typecheck@ gives the dependents of an upgrade
+-- their new references, typechecking only the ones that could be affected ('typecheckFrontier'). @typecheck@ typechecks
+-- the dependent types and the named dependent terms, printed, with the given types for the other terms. It returns
+-- 'Nothing' when only the slow path can tell.
+propagateUpgrade ::
+  Codebase IO Symbol Ann ->
+  Defns (BiMultimap Referent Name) (BiMultimap TypeReference Name) ->
+  List.NonEmpty UpgradeInfo ->
+  DefnsF Set TermReference TypeReference ->
+  DefnsF (Map Name) (TermReferenceId, (Term Symbol Ann, Type Symbol Ann)) (TypeReferenceId, Decl Symbol Ann) ->
+  (Map TermReference (Type Symbol Ann) -> Set Name -> Cli (Maybe (TypecheckedUnisonFile Symbol Ann))) ->
+  Cli (Maybe Propagated)
+propagateUpgrade codebase namespace infos dependencies dependents typecheck = do
+  -- Only the references the dependents make matter, so only those are looked up
+  let terms = foldMap (Term.termDependencies . fst . snd) dependents.terms
+  (libs, termTypes) <-
+    Cli.runTransaction do
+      libs <- upgraded codebase infos (Defns (Set.intersection terms dependencies.terms) dependencies.types)
+      termTypes <-
+        for (Map.toList libs.terms) \(old, new) ->
+          (old,,) <$> Codebase.getTypeOfTerm codebase old <*> Codebase.getTypeOfTerm codebase new
+      pure (libs, termTypes)
+
+  let noFile = UF.typecheckedUnisonFile Map.empty Map.empty [] []
+
+  -- The dependent types get new references the way the slow path gives them, by being printed and parsed
+  declFile <- if Map.null dependents.types then pure (Just noFile) else typecheck Map.empty Set.empty
+
+  case declFile of
+    Nothing -> pure (Just Propagated'Failed)
+    Just declFile -> do
+      let (dependentTypeUpdates, divergedTypes) =
+            typeUpdatesOf namespace.types (fileDeclRefs declFile) (map fst (Map.elems dependents.types))
+      let typeUpdates = libs.types <> dependentTypeUpdates
+      let retype = retypeWith typeUpdates
+
+      -- A dependent type with parameters could change kind with what it mentions
+      let parameterized =
+            Set.fromList
+              [ Reference.fromId ref
+              | (ref, decl) <- Map.elems dependents.types,
+                not (null (Decl.bound (Decl.asDataDecl decl)))
+              ]
+      let printedTypes = libs.printed.types <> divergedTypes <> parameterized
+
+      -- A dependent has to be typechecked again if it builds or matches on a value of a type that changed, or names
+      -- something only the printer can resolve. A term link follows the printer too.
+      let mustPrint :: Term Symbol Ann -> Type Symbol Ann -> Bool
+          mustPrint term typ =
+            not (Set.disjoint (Term.constructorDependencies term) (Map.keysSet typeUpdates))
+              || not (Set.disjoint (Term.typeDependencies term <> Type.dependencies typ) printedTypes)
+              || not (Set.disjoint (Term.termDependencies term) libs.printed.terms)
+              || not (Set.disjoint (Set.fromList [ref | Term.TermLink' (Referent.Ref ref) <- ABT.subterms term]) dependencies.terms)
+
+      let aliased :: TermReferenceId -> Bool
+          aliased ref =
+            Set.size (BiMultimap.lookupDom (Referent.fromTermReferenceId ref) namespace.terms) > 1
+
+      let seeds =
+            printedDependents aliased Set.empty (substitutions Map.empty dependents.terms) dependents.terms
+              <> Map.keysSet (Map.filter (\(_, (term, typ)) -> mustPrint term typ) dependents.terms)
+
+      let changed =
+            Set.fromList
+              [ ref
+              | (ReferenceDerived ref, oldType, newType) <- termTypes,
+                isNothing newType || newType /= fmap retype oldType
+              ]
+
+      let retyped =
+            Map.fromList [(Reference.fromId ref, retype typ) | (ref, (_, typ)) <- Map.elems dependents.terms]
+
+      frontier <-
+        typecheckFrontier
+          (\names -> fmap (termsNamed names) <$> typecheck retyped names)
+          retype
+          dependents.terms
+          seeds
+          changed
+
+      pure case frontier of
+        Frontier'GaveUp -> Nothing
+        Frontier'Failed -> Just Propagated'Failed
+        Frontier'Typechecked typechecked ->
+          Propagated'File
+            <$> substituteDependents noFile declFile Map.empty libs.terms typeUpdates typechecked dependents.terms
 
 makePrettyUnisonFile :: DefnsF (Map Name) (Pretty ColorText) (Pretty ColorText) -> Pretty ColorText
 makePrettyUnisonFile dependents =
