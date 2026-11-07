@@ -26,7 +26,8 @@ import Unison.Merge.EitherWay (EitherWay (..))
 import Unison.Merge.EitherWay qualified as EitherWay
 import Unison.Merge.FindConflictedAlias (findConflictedAlias)
 import Unison.Merge.PartitionCombinedDiffs (narrowConflictsToNonBuiltins)
-import Unison.Merge.Render (renderUnisonFiles)
+import Unison.Merge.Propagate (propagateMerge)
+import Unison.Merge.Render (printedNames, renderUnisonFiles)
 import Unison.Merge.ThreeWay (ThreeWay)
 import Unison.Merge.ThreeWay qualified as ThreeWay
 import Unison.Merge.TwoWay (TwoWay (..))
@@ -53,10 +54,12 @@ import Unison.Term (Term)
 import Unison.Type (Type)
 import Unison.Typechecker qualified as Typechecker
 import Unison.Typechecker.TypeLookup (TypeLookup)
+import Unison.Typechecker.TypeLookup qualified as TL
 import Unison.Typechecker.Variance qualified as Variance
 import Unison.UnconflictedLocalDefnsView (UnconflictedLocalDefnsView (..))
 import Unison.UnisonFile (TypecheckedUnisonFile)
 import Unison.UnisonFile qualified as UnisonFile
+import Unison.UnisonFile.Propagate (Propagated (..), typecheckDependentsAlways)
 import Unison.Util.BiMultimap (BiMultimap)
 import Unison.Util.BiMultimap qualified as BiMultimap
 import Unison.Util.Defn (Defn)
@@ -190,12 +193,12 @@ makeMergeblob hydrate loadDependents loadLibdepsNames loadTypeLookup blob author
 
     typecheckedFile <-
       if defnsAreEmpty conflicts.alice
-        then
+        then do
           let uniqueTypeGuids =
                 Map.mapMaybe (DataDeclaration.uniqueTypeGuid . snd) . (.types)
                   <$> ThreeWay.forgetLca hydratedDefnsByName
 
-              unconflictedDefns =
+          let unconflictedDefns =
                 makeUnconflictedDefns
                   (ThreeWay.gforgetLca blob.declNameLookups)
                   conflictsNames
@@ -203,7 +206,9 @@ makeMergeblob hydrate loadDependents loadLibdepsNames loadTypeLookup blob author
                   dependentsNames
                   (NamesUtils.byName blob.defns.lca.defns)
 
-              parsingEnv =
+          let mergedNames = Names.fromUnconflicted unconflictedDefns <> libdepsNames.new
+
+          let parsingEnv otherNames =
                 ParsingEnv
                   { -- We don't expect to have to generate any new GUIDs, since the uniqueTypeGuid lookup function below should
                     -- cover all name in the merged file we're about to parse and typecheck. So, this might be more correct as a
@@ -220,28 +225,74 @@ makeMergeblob hydrate loadDependents loadLibdepsNames loadTypeLookup blob author
                               uniqueTypeGuids.alice
                               uniqueTypeGuids.bob
                        in \name -> Identity (Map.lookup name guids),
-                    names = Names.fromUnconflicted unconflictedDefns <> libdepsNames.new,
+                    names = otherNames <> mergedNames,
                     maybeNamespace = Nothing,
                     localNamespacePrefixedTypesAndConstructors = mempty
                   }
-           in case runIdentity (Parsers.parseFile "<merge>" (Text.unpack $ Pretty.toPlain 80 unparsedFile) parsingEnv) of
-                Left _err -> pure Nothing
-                Right file -> do
-                  typeLookup <- (UnisonFile.declsToTypeLookup file <>) <$> loadTypeLookup (UnisonFile.dependencies file)
-                  let typecheckingEnv =
-                        Typechecker.Env
-                          { ambientAbilities = [],
-                            termsByShortname = Map.empty,
-                            typeLookup,
-                            freeNameToFuzzyTermsByShortName = Map.empty,
-                            topLevelComponents = Map.empty,
-                            variances = Variance.fromTypeLookup typeLookup
-                          }
-                  FileParsers.synthesizeFile typecheckingEnv file
-                    & Result.runResultT
-                    & runIdentity
-                    & fst
-                    & pure
+
+          -- Typechecks a file with some names beyond the merged ones, and some types given rather than looked up
+          let typecheckFile otherNames retyped unparsed =
+                case runIdentity (Parsers.parseFile "<merge>" (Text.unpack $ Pretty.toPlain 80 unparsed) (parsingEnv otherNames)) of
+                  Left _err -> pure Nothing
+                  Right file -> do
+                    typeLookup0 <- (UnisonFile.declsToTypeLookup file <>) <$> loadTypeLookup (UnisonFile.dependencies file)
+                    let typeLookup = typeLookup0 {TL.typeOfTerms = Map.union retyped typeLookup0.typeOfTerms}
+                    let typecheckingEnv =
+                          Typechecker.Env
+                            { ambientAbilities = [],
+                              termsByShortname = Map.empty,
+                              typeLookup,
+                              freeNameToFuzzyTermsByShortName = Map.empty,
+                              topLevelComponents = Map.empty,
+                              variances = Variance.fromTypeLookup typeLookup
+                            }
+                    FileParsers.synthesizeFile typecheckingEnv file
+                      & Result.runResultT
+                      & runIdentity
+                      & fst
+                      & pure
+
+          let dependents =
+                fold (zipDefnsWith Map.restrictKeys Map.restrictKeys <$> ThreeWay.forgetLca hydratedDefnsByName <*> dependentsNames)
+
+          -- Typechecks the dependent types and the named dependent terms. The others keep their names, for the terms
+          -- printed to refer to, with their old references.
+          let typecheckDependents retyped names =
+                let (unparsed, _, _) =
+                      renderUnisonFiles
+                        authors
+                        blob.declNameLookups
+                        (NamesUtils.byName . (.defns) <$> blob.defns)
+                        hydratedDefnsByName
+                        libdepsNames
+                        conflictsNames
+                        (over #terms (Set.intersection names) <$> dependentsNames)
+                 in typecheckFile
+                      ( Names.fromUnconflicted
+                          Defns
+                            { terms = Referent.fromTermReferenceId . fst <$> Map.withoutKeys dependents.terms names,
+                              types = Map.empty
+                            }
+                      )
+                      retyped
+                      unparsed
+
+          propagated <-
+            if defnsAreEmpty dependents || typecheckDependentsAlways
+              then pure Nothing
+              else
+                propagateMerge
+                  typecheckDependents
+                  loadTypeLookup
+                  (printedNames (Names.fromUnconflicted . NamesUtils.byName . (.defns) <$> blob.defns) libdepsNames)
+                  mergedNames
+                  dependents
+
+          case propagated of
+            Just (Propagated'File file) -> pure (Just file)
+            -- A dependent that fails to typecheck against the types the others keep fails in the whole file too
+            Just Propagated'Failed -> pure Nothing
+            Nothing -> typecheckFile mempty Map.empty unparsedFile
         else pure Nothing
 
     pure $
