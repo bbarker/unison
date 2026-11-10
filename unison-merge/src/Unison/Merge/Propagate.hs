@@ -14,7 +14,7 @@ import Unison.Names (Names (..))
 import Unison.Names qualified as Names
 import Unison.Parser.Ann (Ann)
 import Unison.Prelude
-import Unison.Reference (Reference' (ReferenceDerived), TermReference, TermReferenceId, TypeReference, TypeReferenceId)
+import Unison.Reference (Reference' (ReferenceBuiltin, ReferenceDerived), TermReference, TermReferenceId, TypeReference, TypeReferenceId)
 import Unison.Reference qualified as Reference
 import Unison.Referent qualified as Referent
 import Unison.Symbol (Symbol)
@@ -141,7 +141,11 @@ propagateMerge typecheck loadTypeLookup printed merged dependents = do
 
       let retype = retypeWith typeUpdates
 
-      let printedTerms = Set.fromList [ref | (ref, Nothing) <- termDestinations]
+      -- A reference that moves to a builtin is left to the printer too: its type isn't compared with the builtin's
+      let printedTerms =
+            Set.fromList $
+              [ref | (ref, Nothing) <- termDestinations]
+                ++ [ref | (ref, Target'Namespace (ReferenceBuiltin _)) <- movedTerms]
 
       let toDependents = substitutions Map.empty dependents.terms
 
@@ -162,7 +166,7 @@ propagateMerge typecheck loadTypeLookup printed merged dependents = do
               term@(Term.Ref' ref) -> Term.ref (ABT.annotation term) <$> Map.lookup ref moved
               _ -> Nothing
 
-      -- A reference that moves to something of another type is a change of type in its destination
+      -- A reference that moves to a term of another type is a change of type in its destination
       let changed =
             Set.fromList
               [ id
