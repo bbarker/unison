@@ -491,3 +491,414 @@ user =
   broken 1 + 1
 
 ```
+
+A reference can move to a dependent on the other side that has another type. Alice changes `z` and adds `c`, which uses
+`y`, a `Nat` for her. Bob makes `y` a `Text` that still uses `z`, so `c` is typechecked against Bob's `y`.
+
+``` unison
+z : Nat
+z = 1
+
+y : Nat
+y = z + 1
+```
+
+``` ucm :added-by-ucm
+  Loading changes detected in scratch.u.
+
+  + y : Nat
+  + z : Nat
+  ~ broken : Text -> Text
+  - user : Nat
+
+  + (added), ~ (modified), - (deleted)
+
+  Run `update` to apply these changes to your codebase and
+  complete the merge, or `cancel` to cancel the merge.
+```
+
+``` ucm
+cross/main> builtins.merge lib.builtin
+
+  Done.
+
+cross/main> update
+
+  Okay, I'm searching the branch for code that needs to be
+  updated...
+
+  Done.
+
+cross/main> branch alice
+
+  Done. I've created the alice branch based off of main.
+
+  Tip: To merge your work back into the main branch, first
+       `switch /main` then `merge /alice`.
+
+cross/main> branch bob
+
+  Done. I've created the bob branch based off of main.
+
+  Tip: To merge your work back into the main branch, first
+       `switch /main` then `merge /bob`.
+```
+
+``` unison
+z : Nat
+z = 2
+
+c : Nat
+c = List.size [y]
+```
+
+``` ucm :added-by-ucm
+  Loading changes detected in scratch.u.
+
+  Also typechecking, from the codebase: y. They use what this
+  file redefines, so they are part of the file now, and `update`
+  saves them rebuilt on the new definition.
+
+  + c : Nat
+  ~ y : Nat
+  ~ z : Nat
+
+  + (added), ~ (modified)
+
+  Run `update` to apply these changes to your codebase.
+```
+
+``` ucm
+cross/alice> update
+
+  Okay, I'm searching the branch for code that needs to be
+  updated...
+
+  Done.
+```
+
+``` unison
+y : Text
+y = Nat.toText z
+```
+
+``` ucm :added-by-ucm
+  Loading changes detected in scratch.u.
+
+  ~ y : Text
+
+  ~ (modified)
+
+  Run `update` to apply these changes to your codebase.
+```
+
+``` ucm
+cross/bob> update
+
+  Okay, I'm searching the branch for code that needs to be
+  updated...
+
+  Done.
+```
+
+``` ucm
+cross/alice> merge /bob
+
+  Loading namespaces...
+
+  Computing diff...
+
+  Loading definitions...
+
+  Computing merge...
+
+  I merged cross/bob into cross/alice.
+```
+
+``` ucm
+cross/alice> view c y
+
+  c : Nat
+  c = List.size [y]
+
+  y : Text
+  y = Nat.toText z
+```
+
+When Alice's `c` only typechecks with the `y` she has, the merge fails.
+
+``` unison
+z : Nat
+z = 1
+
+y : Nat
+y = z + 1
+```
+
+``` ucm :added-by-ucm
+  Loading changes detected in scratch.u.
+
+  ~ y : Nat
+  ~ z : Nat
+
+  ~ (modified)
+
+  Run `update` to apply these changes to your codebase.
+```
+
+``` ucm
+crossfail/main> builtins.merge lib.builtin
+
+  Done.
+
+crossfail/main> update
+
+  Okay, I'm searching the branch for code that needs to be
+  updated...
+
+  Done.
+
+crossfail/main> branch alice
+
+  Done. I've created the alice branch based off of main.
+
+  Tip: To merge your work back into the main branch, first
+       `switch /main` then `merge /alice`.
+
+crossfail/main> branch bob
+
+  Done. I've created the bob branch based off of main.
+
+  Tip: To merge your work back into the main branch, first
+       `switch /main` then `merge /bob`.
+```
+
+``` unison
+z : Nat
+z = 2
+
+c : Nat
+c = y + 1
+```
+
+``` ucm :added-by-ucm
+  Loading changes detected in scratch.u.
+
+  Also typechecking, from the codebase: y. They use what this
+  file redefines, so they are part of the file now, and `update`
+  saves them rebuilt on the new definition.
+
+  + c : Nat
+  ~ y : Nat
+  ~ z : Nat
+
+  + (added), ~ (modified)
+
+  Run `update` to apply these changes to your codebase.
+```
+
+``` ucm
+crossfail/alice> update
+
+  Okay, I'm searching the branch for code that needs to be
+  updated...
+
+  Done.
+```
+
+``` unison
+y : Text
+y = Nat.toText z
+```
+
+``` ucm :added-by-ucm
+  Loading changes detected in scratch.u.
+
+  ~ y : Text
+
+  ~ (modified)
+
+  Run `update` to apply these changes to your codebase.
+```
+
+``` ucm
+crossfail/bob> update
+
+  Okay, I'm searching the branch for code that needs to be
+  updated...
+
+  Done.
+```
+
+``` ucm :error
+crossfail/alice> merge /bob
+
+  Loading namespaces...
+
+  Computing diff...
+
+  Loading definitions...
+
+  Computing merge...
+
+  I couldn't automatically merge crossfail/bob into
+  crossfail/alice.
+
+  You're now on a temporary branch, merge-bob-into-alice, and
+  the definitions to fix are in merge-bob-into-alice-35dfe91d.u.
+
+  Edit the file, then run:
+
+      crossfail/merge-bob-into-alice> load merge-bob-into-alice-35dfe91d.u
+
+  If `load` reports errors, fix them and run it again. When the
+  file loads with no errors, run:
+
+      crossfail/merge-bob-into-alice> update
+
+  `update` saves the file's definitions into alice, removes any
+  definitions you deleted from the file, and deletes the
+  temporary branch. To abandon the merge instead, run `cancel`.
+
+  Note: Definitions listed in the file don't exist in the branch
+  until a successful `update`.
+```
+
+``` unison :added-by-ucm merge-bob-into-alice-35dfe91d.u
+c : Nat
+c =
+  use Nat +
+  y + 1
+
+y : Text
+y = Nat.toText z
+
+```
+
+A name that the other side points at a builtin is typechecked against it as well. Bob makes `x` another name for
+`Nat.increment`, and Alice's `c` uses `x` as a `Nat`.
+
+``` unison
+x : Nat
+x = 1
+```
+
+``` ucm :added-by-ucm
+  Loading changes detected in scratch.u.
+
+  + x : Nat
+  - c : Nat
+  - y : Nat
+
+  (and 1 unchanged term)
+
+  + (added), - (deleted)
+
+  Run `update` to apply these changes to your codebase and
+  complete the merge, or `cancel` to cancel the merge.
+```
+
+``` ucm
+builtin/main> builtins.merge lib.builtin
+
+  Done.
+
+builtin/main> update
+
+  Okay, I'm searching the branch for code that needs to be
+  updated...
+
+  Done.
+
+builtin/main> branch alice
+
+  Done. I've created the alice branch based off of main.
+
+  Tip: To merge your work back into the main branch, first
+       `switch /main` then `merge /alice`.
+
+builtin/main> branch bob
+
+  Done. I've created the bob branch based off of main.
+
+  Tip: To merge your work back into the main branch, first
+       `switch /main` then `merge /bob`.
+```
+
+``` unison
+c : Nat
+c = x + 1
+```
+
+``` ucm :added-by-ucm
+  Loading changes detected in scratch.u.
+
+  + c : Nat
+
+  Run `update` to apply these changes to your codebase.
+```
+
+``` ucm
+builtin/alice> update
+
+  Okay, I'm searching the branch for code that needs to be
+  updated...
+
+  Done.
+```
+
+``` ucm
+builtin/bob> delete.term x
+
+  I deleted these terms:
+
+    1. x
+
+  Tip: You can use `undo` or use a hash from `reflog` to undo
+       this change.
+
+builtin/bob> alias.term lib.builtin.Nat.increment x
+
+  Done.
+```
+
+``` ucm :error
+builtin/alice> merge /bob
+
+  Loading namespaces...
+
+  Computing diff...
+
+  Loading definitions...
+
+  Computing merge...
+
+  I couldn't automatically merge builtin/bob into builtin/alice.
+
+  You're now on a temporary branch, merge-bob-into-alice, and
+  the definitions to fix are in merge-bob-into-alice-c907da9f.u.
+
+  Edit the file, then run:
+
+      builtin/merge-bob-into-alice> load merge-bob-into-alice-c907da9f.u
+
+  If `load` reports errors, fix them and run it again. When the
+  file loads with no errors, run:
+
+      builtin/merge-bob-into-alice> update
+
+  `update` saves the file's definitions into alice, removes any
+  definitions you deleted from the file, and deletes the
+  temporary branch. To abandon the merge instead, run `cancel`.
+
+  Note: Definitions listed in the file don't exist in the branch
+  until a successful `update`.
+```
+
+``` unison :added-by-ucm merge-bob-into-alice-c907da9f.u
+c : Nat
+c =
+  use Nat +
+  x + 1
+
+```
