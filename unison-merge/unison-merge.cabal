@@ -30,6 +30,7 @@ library
       Unison.Merge.Mergeblob
       Unison.Merge.Narrow
       Unison.Merge.PartitionCombinedDiffs
+      Unison.Merge.Propagate
       Unison.Merge.Rename
       Unison.Merge.Render
       Unison.Merge.Synhash
